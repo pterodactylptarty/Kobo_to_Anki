@@ -1,6 +1,6 @@
 import sqlite3
 
-def fetch_annotations(author=None, title=None):
+def fetch_annotations(author=None, title=None, start_date=None, end_date=None):
     # Base query that fetches all annotations
 
     # Connect to the SQLite database
@@ -9,7 +9,9 @@ def fetch_annotations(author=None, title=None):
 
     query = """
     SELECT 
-        Bookmark.Text AS Annotation,
+        Bookmark.Text,
+        Bookmark.Annotation,
+        Bookmark.DateCreated,
         AuthorContent.Attribution AS Author,
         ChapterContent.BookTitle
     FROM 
@@ -33,6 +35,14 @@ def fetch_annotations(author=None, title=None):
     if title:
         query += " AND ChapterContent.BookTitle = ?"
         params.append(title)
+    # Add date range to the query
+
+    if start_date and end_date:
+        query += " AND Bookmark.DateCreated BETWEEN ? AND ?"
+        params.append(start_date)
+        params.append(end_date)
+
+    query += " ORDER BY Bookmark.DateCreated ASC"
 
     # Assuming db_connection is your database connection object
         # Execute the query
@@ -46,7 +56,8 @@ def fetch_annotations(author=None, title=None):
         print(result)
 
 # Example usage:
-#fetch_annotations() # Fetches all annotations
+fetch_annotations() # Fetches all annotations
 #fetch_annotations(author="Michael Ende") # Fetches annotations for a specific author
 #fetch_annotations(title="Die unendliche Geschichte") # Fetches annotations for a specific book title
 # fetch_annotations(author="Mariana Mazzucato", title="Mission Economy") # Specific author and title
+#fetch_annotations(start_date='11-23', end_date='2024-02')
