@@ -9,7 +9,15 @@ import deepl
 import genanki
 import random
 import os
-from .constants import my_model, speaker, auth_key
+import openai
+from datetime import datetime
+from .constants import my_model, auth_key, openai_key
+
+
+openai.api_key = openai_key
+client = openai.OpenAI(api_key=openai.api_key)
+translator = deepl.Translator(auth_key)
+
 
 ## function from https://github.com/karlicoss/kobuddy
 def get_kobo_mountpoint(label: str='KOBOeReader') -> Optional[Path]:
@@ -41,6 +49,38 @@ def get_kobo_mountpoint(label: str='KOBOeReader') -> Optional[Path]:
         [kobo] = kobos
         return Path(kobo)
 
+
+def fetch_books_and_authors(ownpath=None):
+    # Connect to the SQLite database
+    if ownpath is None:
+        conn = sqlite3.connect(get_kobo_mountpoint() / '.kobo' / 'KoboReader.sqlite')
+    else:
+        conn = sqlite3.connect(ownpath)
+    cursor = conn.cursor()
+
+    # Define the SQL query to fetch unique books and their authors
+    query = """
+    SELECT DISTINCT
+        ChapterContent.BookTitle AS Book,
+        AuthorContent.Attribution AS Author
+    FROM 
+        Content AS ChapterContent
+    LEFT JOIN 
+        Content AS AuthorContent ON ChapterContent.BookID = AuthorContent.ContentID AND AuthorContent.ContentType = 6
+    WHERE
+        ChapterContent.ContentType = 899
+    ORDER BY 
+        AuthorContent.Attribution ASC
+    """
+
+    # Execute the query
+    cursor.execute(query)
+    results = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    for result in results:
+        print(f"Author:{result[1]}| Book:{result[0]}")
 
 ## Function to run an SQL Query filtering on below arguments (or all if arguments not specified). Prints results as tuples (I think).
 def fetch_annotations(author=None, title=None, start_date=None, end_date=None, ownpath=None, print_results=False):
@@ -112,7 +152,6 @@ def fetch_annotations(author=None, title=None, start_date=None, end_date=None, o
 
 
 
-translator = deepl.Translator(auth_key) ## TODO: I'm pretty sure this should go in main, but not sure.
 
 def fetch_and_translate(author=None, title=None, start_date=None, end_date=None, ownpath=None, print_results=False):
     # Connect to the SQLite database
@@ -216,12 +255,13 @@ def save_to_csv(author=None, title=None, start_date=None, end_date=None, ownpath
 ## create actual anki decks.
 
 
-
-def create_deck(deck_name):
+def create_deck(deck_name=None):
     # Generate a random number for the deck ID within a large range
     random_deck_id = random.randint(int(1e9), int(1e10))
 
-    # Create a new genanki Deck with the random deck ID and the specified name
+    if deck_name is None:
+        deck_name = "Deck_" + datetime.now().strftime("%Y-%m-%d")
+
     my_deck = genanki.Deck(random_deck_id, deck_name)
 
     return my_deck
@@ -236,23 +276,28 @@ def make_note(lang, eng, audio):    ## would need to be part of a larger functio
 
 
 
-def text_to_speech(text, voice, output_file):
+def text_to_speech(text, output_file):
     """
     Convert text to speech using a specified voice and save to an output file.
 
     :param text: The text to be spoken.
-    :param voice: The voice to use for speech synthesis.
     :param output_file: The file path to save the audio output.
     """
     try:
         # Constructing the command to use macOS's say command
-        command = f'say -v {voice} "{text}" -o {output_file}'
+        response = client.audio.speech.create(
+            model="tts-1",
+            voice="nova",  # other voices: 'echo', 'fable', 'onyx', 'nova', 'shimmer'
+            input=text
+        )
 
         # Executing the command
-        subprocess.run(command, shell=True, check=True)
+        response.stream_to_file(output_file)
         print(f"Audio saved to {output_file}")
-    except subprocess.CalledProcessError as e:
-        print(f"Error in text-to-speech conversion: {e}")
+    except Exception as e:
+        print(f"Error translating '{text}': {e}")
+        return ""
+
 
 
 
@@ -261,17 +306,18 @@ def make_anki_cards(deck_name, media_list, author=None, title=None, start_date=N
     for row in modified_rows:
         lang = row[0]
         eng = row[1]
-        file_name = f'{lang.replace(" ", "_")[:10]}.aiff'
+        file_name = f'{lang.replace(" ", "_")[:10]}.mp3'
         formatted_file_name =f'[sound:{file_name}]'
         media_list.append(file_name)
 
 
-        text_to_speech(lang, speaker, file_name) ## TODO: change voice to be a parameter for different languages
+        text_to_speech(lang, file_name)
 
         note = make_note(lang, eng, formatted_file_name)
         deck_name.add_note(note)
 
-def bundle_anki_package(deck, media_files, output_filename):
+
+def bundle_anki_package(deck, media_files, output_filename=None):
     """
     Bundles the provided deck and media files into an Anki package and writes it to a file.
 
@@ -280,6 +326,10 @@ def bundle_anki_package(deck, media_files, output_filename):
     - media_files: A list of paths to media files to be included in the package.
     - output_filename: The name of the output .apkg file.
     """
+
+    if output_filename is None:
+        output_filename = f"{deck.name}.apkg"
+
     my_package = genanki.Package(deck)
     my_package.media_files = media_files
     my_package.write_to_file(output_filename)
