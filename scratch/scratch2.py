@@ -20,9 +20,16 @@ def text_to_speech(text, voice, output_file):
         print(f"Error in text-to-speech conversion: {e}")
 
 
-# Example usage
-text = "Ciao, come stai oggi?"
-voice = "Alice"  # Replace "Alice" with the actual name of Siri Voice 2 for Italian
-output_file = "output.aiff"  # Output file name
+# # Example usage
+#italian
+# text = "Ciao, come stai oggi?"
+# voice = "Alice"  # Replace "Alice" with the actual name of Siri Voice 2 for Italian
+# output_file = "output.aiff"  # Output file name
 
+
+
+#german
+text = "Hallo, wie gehts bei dir?"
+voice = "Anna"  # Replace "Alice" with the actual name of Siri Voice 2 for Italian
+output_file = "output.aiff"
 text_to_speech(text, voice, output_file)

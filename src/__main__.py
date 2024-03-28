@@ -54,3 +54,4 @@ if __name__ == "__main__":
     ## maybe first see if there is an option to search through and add to an exisiting deck
 ## todo: also need option for reading a csv file to skip highlights that have already been added.
 
+## todo: add reverse note option for highlights with a note. (idea, annotate 'r' for reverse cards). Also maype specific tags for idioms.
