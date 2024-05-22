@@ -1,6 +1,6 @@
 # Kobo Anki Card Generator
 
-This project extracts annotations from a Kobo e-reader and converts them into Anki flashcards with text and audio for language learning. It should translate from any language into English, with the target language on the front and English on the back. It uses DeepL for translation and OpenAI for text to speech generation. The newly created decks can either be manually added to Anki or automatically uploaded using AnkiConnect.
+This project extracts annotations from a Kobo eReader and converts them into Anki flashcards with text and audio for language learning. It should translate from any language into English, with the target language on the front and English on the back. It uses DeepL for translation and OpenAI for text to speech generation. The newly created decks can either be manually added to Anki or automatically uploaded using AnkiConnect.
 
 The program should automatically connect to the Kobo if it is plugged in to the computer, however there is also the option to manually direct to the SQLite database if the automatic connection isn't working.
 
