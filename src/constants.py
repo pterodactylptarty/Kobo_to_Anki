@@ -1,6 +1,6 @@
 import genanki
 ## DeepL api auth key
-auth_key = "39b72c5b-fd7a-4202-81e0-97503e999e6b:fx"  # Replace with your key
+auth_key = "39b72c5b-fd7a-4202-81e0-97503e999e6b:fx"
 openai_key = "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"
 
 
@@ -40,10 +40,3 @@ my_model = genanki.Model(
     css=my_css
 
 )
-
-
-#Voice for language:
-german = "Anna (Premium)"
-italian = "Federica (Premium)"
-
-## TODO: think about whether to add language parameter in funcitons part. Then language selected can maybe map to a voice defined here.

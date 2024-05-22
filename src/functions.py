@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -10,6 +9,8 @@ import genanki
 import random
 import os
 import openai
+import requests
+import json
 from datetime import datetime
 from .constants import my_model, auth_key, openai_key
 
@@ -73,7 +74,6 @@ def fetch_books_and_authors(ownpath=None):
         AuthorContent.Attribution ASC
     """
 
-    # Execute the query
     cursor.execute(query)
     results = cursor.fetchall()
     cursor.close()
@@ -82,7 +82,7 @@ def fetch_books_and_authors(ownpath=None):
     for result in results:
         print(f"Author:{result[1]}| Book:{result[0]}")
 
-## Function to run an SQL Query filtering on below arguments (or all if arguments not specified). Prints results as tuples (I think).
+## Function to run an SQL Query filtering on below arguments (or all if arguments not specified). Prints results as tuples.
 def fetch_annotations(author=None, title=None, start_date=None, end_date=None, ownpath=None, print_results=False):
     # Connect to the SQLite database
     if ownpath == None:
@@ -108,10 +108,8 @@ def fetch_annotations(author=None, title=None, start_date=None, end_date=None, o
         1=1
     """
 
-    # Initialize an empty list to hold parameters for SQL query
     params = []
 
-    # Add conditions to the query based on user input
     if author:
         query += " AND AuthorContent.Attribution = ?"
         params.append(author)
@@ -119,7 +117,6 @@ def fetch_annotations(author=None, title=None, start_date=None, end_date=None, o
     if title:
         query += " AND ChapterContent.BookTitle = ?"
         params.append(title)
-    # Add date range to the query
 
     if start_date and end_date:
         query += " AND Bookmark.DateCreated BETWEEN ? AND ?"
@@ -128,14 +125,11 @@ def fetch_annotations(author=None, title=None, start_date=None, end_date=None, o
 
     query += " ORDER BY Bookmark.DateCreated ASC"
 
-        # Execute the query
     cursor.execute(query, params)
     results = cursor.fetchall()
     cursor.close()
 
 
-    # Assuming results are in a list of tuples or similar structure
-    # Adjust the printing or handling of results as needed
     if print_results:
         for result in results:
             print(result)
@@ -178,10 +172,8 @@ def fetch_and_translate(author=None, title=None, start_date=None, end_date=None,
         1=1
     """
 
-    # Initialize an empty list to hold parameters for SQL query
     params = []
 
-    # Add conditions to the query based on user input
     if author:
         query += " AND AuthorContent.Attribution = ?"
         params.append(author)
@@ -189,7 +181,6 @@ def fetch_and_translate(author=None, title=None, start_date=None, end_date=None,
     if title:
         query += " AND ChapterContent.BookTitle = ?"
         params.append(title)
-    # Add date range to the query
 
     if start_date and end_date:
         query += " AND Bookmark.DateCreated BETWEEN ? AND ?"
@@ -198,15 +189,13 @@ def fetch_and_translate(author=None, title=None, start_date=None, end_date=None,
 
     query += " ORDER BY Bookmark.DateCreated ASC"
 
-        # Execute the query
     cursor.execute(query, params)
     results = cursor.fetchall()
     cursor.close()
 
     modified_rows = []
 
-    # Assuming results are in a list of tuples or similar structure
-    # Adjust the printing or handling of results as needed
+
 
     for result in results:
        # print(result)
@@ -230,7 +219,6 @@ def print_first_rows(author=None, title=None, start_date=None, end_date=None, ow
         results = fetch_annotations(author, title, start_date, end_date, ownpath)
         print('Text', 'Annotation', 'DateCreated', 'Author', 'BookTitle')
 
-    # Print the first few rows, adjusting as necessary for your use case.
     for row in results[:5]:
         print(row)
 
@@ -251,12 +239,10 @@ def save_to_csv(author=None, title=None, start_date=None, end_date=None, ownpath
 #save_to_csv(title="Momo", start_date="2023-11-11", end_date="2023-11-15", translate=True, file_name="ende_annotations2.csv")
 
 
-## now, once I have a text to speech thing (and put the file name in the csv), I can already start using it in Anki. But it would be cool to have it
-## create actual anki decks.
 
 
 def create_deck(deck_name=None):
-    # Generate a random number for the deck ID within a large range
+    # Generate a random number
     random_deck_id = random.randint(int(1e9), int(1e10))
 
     if deck_name is None:
@@ -277,14 +263,7 @@ def make_note(lang, eng, audio):    ## would need to be part of a larger functio
 
 
 def text_to_speech(text, output_file):
-    """
-    Convert text to speech using a specified voice and save to an output file.
-
-    :param text: The text to be spoken.
-    :param output_file: The file path to save the audio output.
-    """
     try:
-        # Constructing the command to use macOS's say command
         response = client.audio.speech.create(
             model="tts-1",
             voice="nova",  # other voices: 'echo', 'fable', 'onyx', 'nova', 'shimmer'
@@ -318,14 +297,6 @@ def make_anki_cards(deck_name, media_list, author=None, title=None, start_date=N
 
 
 def bundle_anki_package(deck, media_files, output_filename=None):
-    """
-    Bundles the provided deck and media files into an Anki package and writes it to a file.
-
-    Args:
-    - deck: The genanki.Deck object to be included in the package.
-    - media_files: A list of paths to media files to be included in the package.
-    - output_filename: The name of the output .apkg file.
-    """
 
     if output_filename is None:
         output_filename = f"{deck.name}.apkg"
@@ -337,15 +308,32 @@ def bundle_anki_package(deck, media_files, output_filename=None):
     print(f"Package written to {output_filename}")
 
 def delete_media_files(media_files):
-    """
-    Deletes the specified media files from the filesystem.
-
-    Args:
-    - media_files: A list of paths to media files to be deleted.
-    """
     for file_path in media_files:
         try:
             os.remove(file_path)
             print(f"Deleted file: {file_path}")
         except OSError as e:
             print(f"Error deleting file {file_path}: {e.strerror}")
+
+
+
+def import_deck_to_anki(deck_path):
+    abs_path = os.path.abspath(deck_path)
+    url = 'http://localhost:8765'
+    headers = {'Content-Type': 'application/json'}
+    payload = {
+        "action": "importPackage",
+        "version": 6,
+        "params": {
+            "path": abs_path
+        }
+    }
+
+    response = requests.post(url, json=payload, headers=headers)
+    if response.status_code == 200:
+        print("Deck imported successfully into Anki.")
+    else:
+        print("Failed to import deck into Anki.")
+
+
+

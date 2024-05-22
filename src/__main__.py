@@ -1,5 +1,5 @@
-from .functions import create_deck, print_first_rows, make_anki_cards, bundle_anki_package, delete_media_files, fetch_books_and_authors
-from .constants import german, italian
+from .functions import (create_deck, print_first_rows, make_anki_cards, bundle_anki_package,
+                        delete_media_files, fetch_books_and_authors, import_deck_to_anki)
 import argparse
 
 media_list = []
@@ -16,6 +16,7 @@ def main():
     parser.add_argument('--own-path', help='Enter own path to file if not connecting directly to kobo.')
     parser.add_argument('--file-name', help='Name of the output anki package')
     parser.add_argument('--list-books', action='store_true', help='List available books and authors and exit.')
+    parser.add_argument('--import-to-anki', action='store_true', help='Import the deck to Anki after creating it.')
     args = parser.parse_args()
 
     if args.list_books:
@@ -44,6 +45,10 @@ def main():
     #4. delete audio files to reduce clutter
     delete_media_files(media_list)
 
+    #5. optionally import to anki
+
+    if args.import_to_anki:
+        import_deck_to_anki(args.file_name)
 
 if __name__ == "__main__":
     main()
@@ -55,3 +60,7 @@ if __name__ == "__main__":
 ## todo: also need option for reading a csv file to skip highlights that have already been added.
 
 ## todo: add reverse note option for highlights with a note. (idea, annotate 'r' for reverse cards). Also maype specific tags for idioms.
+
+## todo: periodic saving in case of interruption
+
+### last sync Apr 9, 4:14 pm.
