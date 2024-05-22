@@ -1,12 +1,13 @@
 from .functions import (create_deck, print_first_rows, make_anki_cards, bundle_anki_package,
-                        delete_media_files, fetch_books_and_authors, import_deck_to_anki)
+                        delete_media_files, fetch_books_and_authors, import_deck_to_anki, initialize_api_clients)
 import argparse
 
 media_list = []
 
 
-
 def main():
+
+
     parser = argparse.ArgumentParser(description="Extract annotations from a Kobo device.")
     parser.add_argument('--deck-name', help='Name of Anki Deck to create. (defaults to date)')
     parser.add_argument('--author', help='Filter annotations by author name.')
@@ -17,7 +18,17 @@ def main():
     parser.add_argument('--file-name', help='Name of the output anki package')
     parser.add_argument('--list-books', action='store_true', help='List available books and authors and exit.')
     parser.add_argument('--import-to-anki', action='store_true', help='Import the deck to Anki after creating it.')
+    parser.add_argument('--deepL-key', help='Your DeepL API key.')
+    parser.add_argument('--openai-key', help='Your OpenAI API key.')
     args = parser.parse_args()
+
+    deepL_key = args.deepL_key
+    openai_key = args.openai_key
+
+    # Initialize API clients with the provided keys
+    initialize_api_clients(deepL_key, openai_key)
+
+
 
     if args.list_books:
         fetch_books_and_authors(args.own_path)
@@ -55,12 +66,13 @@ if __name__ == "__main__":
 
 
 
-## todo: add option to export as csv, with audio put in a folder. Seems cumbursome but necessary for updating a deck.
+
+## potential future additions:
+    ##  add option to export as csv, with audio put in a folder. Seems cumbursome but potentially useful for updating a deck.
     ## maybe first see if there is an option to search through and add to an exisiting deck
-## todo: also need option for reading a csv file to skip highlights that have already been added.
+    ## option for reading a csv file to skip highlights that have already been added
+    ## add reverse note option for highlights with a note. (idea, annotate 'r' for reverse cards). Also maype specific tags for idioms.
+    ## periodic saving in case of interruption
+    ## count of cards to be translated and something to show progress as translations are being done
 
-## todo: add reverse note option for highlights with a note. (idea, annotate 'r' for reverse cards). Also maype specific tags for idioms.
 
-## todo: periodic saving in case of interruption
-
-### last sync Apr 9, 4:14 pm.

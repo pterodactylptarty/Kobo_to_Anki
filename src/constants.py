@@ -1,7 +1,5 @@
 import genanki
-## DeepL api auth key
-auth_key = "39b72c5b-fd7a-4202-81e0-97503e999e6b:fx"
-openai_key = "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"
+
 
 
 

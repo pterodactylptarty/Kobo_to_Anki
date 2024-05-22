@@ -12,13 +12,17 @@ import openai
 import requests
 import json
 from datetime import datetime
-from .constants import my_model, auth_key, openai_key
+from .constants import my_model
 
+client = None
+translator = None
 
-openai.api_key = openai_key
-client = openai.OpenAI(api_key=openai.api_key)
-translator = deepl.Translator(auth_key)
-
+def initialize_api_clients(deepL_key, openai_key):
+    global translator
+    global client
+    openai.api_key = openai_key
+    client = openai.OpenAI(api_key=openai.api_key)
+    translator = deepl.Translator(deepL_key)
 
 ## function from https://github.com/karlicoss/kobuddy
 def get_kobo_mountpoint(label: str='KOBOeReader') -> Optional[Path]:
