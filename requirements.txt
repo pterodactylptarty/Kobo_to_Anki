@@ -24,3 +24,4 @@ soupsieve==2.5
 tqdm==4.66.2
 typing_extensions==4.10.0
 urllib3==2.2.1
+
