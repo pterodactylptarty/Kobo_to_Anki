@@ -289,7 +289,7 @@ def make_anki_cards(deck_name, media_list, author=None, title=None, start_date=N
     for row in modified_rows:
         lang = row[0]
         eng = row[1]
-        file_name = f'{lang.replace(" ", "_")[:10]}.mp3'
+        file_name = f'{lang.replace(" ", "_")[:16]}.mp3'
         formatted_file_name =f'[sound:{file_name}]'
         media_list.append(file_name)
 
