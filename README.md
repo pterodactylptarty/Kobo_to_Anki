@@ -4,6 +4,10 @@ This project extracts annotations from a Kobo eReader and converts them into Ank
 
 The program should automatically connect to the Kobo if it is plugged in to the computer, however there is also the option to manually direct to the SQLite database if the automatic connection isn't working.
 
+July 1, 2024 Update: Added a way to use this with a UI because running it by command line was annoying. Now only the UI_script.py and api_keys.py script need to be downloaded, and the whole tool can be used by running the ui_script.py file. You just need to replace the deepL and openai api keys with your own.
+
+Leaving the command line-based script up in the src directory in case it is useful for anyone, but the UI script is definitely is easier to use. 
+
 
 ## Features
 
