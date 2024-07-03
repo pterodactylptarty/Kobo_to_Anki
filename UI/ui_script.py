@@ -30,6 +30,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 task_queue = Queue()
+error_queue = Queue()
 
 
 is_running = False
@@ -46,12 +47,12 @@ current_progress = 0
 current_phase = "Translation"
 
 
-# Initialize API clients
-async_client = AsyncOpenAI(api_key=openai_key)
-translator = deepl.Translator(DeepL)
+# # Initialize API clients
+# async_client = AsyncOpenAI(api_key=openai_key)
+# translator = deepl.Translator(DeepL)
 
 # Semaphore to limit concurrent API calls
-sem = asyncio.Semaphore(2)  # Adjust this number based on API rate limits
+#sem = asyncio.Semaphore(2)  # Adjust this number based on API rate limits
 
 
 my_css = """
@@ -377,7 +378,7 @@ def make_note(lang, eng, audio):    ## would need to be part of a larger functio
   )
 
 
-async def async_text_to_speech(text, output_file):
+async def async_text_to_speech(text, output_file, sem):
     async with sem:
         try:
             response = await async_client.audio.speech.create(
@@ -397,6 +398,9 @@ async def make_anki_cards(deck_name, media_list, author=None, title=None, start_
     global is_running
     translation_generator = fetch_and_translate(author, title, start_date, end_date, ownpath)
     modified_rows = []
+
+    #Semaphore
+    sem = asyncio.Semaphore(2)
 
     # Translation phase
     total = 0
@@ -423,7 +427,7 @@ async def make_anki_cards(deck_name, media_list, author=None, title=None, start_
         formatted_file_name = f'[sound:{file_name}]'
         media_list.append(file_name)
 
-        success = await async_text_to_speech(lang, file_name)
+        success = await async_text_to_speech(lang, file_name, sem)  # Pass the semaphore here
         if not success:
             print(f"Failed to create audio for: {lang}")
             return
@@ -529,6 +533,7 @@ def post_processing(new_deck, deck_name):
         is_running = False
         root.after(0, lambda: abort_button.config(state=tk.DISABLED))
         root.after(0, lambda: deck_button.config(state=tk.NORMAL))
+        root.after(0, update_ui)
     logging.info("Post-processing completed")
 
 def signal_handler(sig, frame):
@@ -536,12 +541,25 @@ def signal_handler(sig, frame):
     cleanup_mp3_files()
     sys.exit(0)
 def run_all():
-    global new_deck, media_list, deck_name, processed_cards, current_progress, current_phase, is_running, loop
+    global new_deck, media_list, deck_name, processed_cards, current_progress, current_phase, is_running, loop, async_client, translator
     is_running = True
     processed_cards = {}
     current_progress = 0
     current_phase = "Translation"
     media_list = []
+
+    # Get API keys from entry fields
+    openai_api_key = openai_key_entry.get() or openai_key  # Fallback to default if empty
+    deepl_api_key = deepl_key_entry.get() or DeepL  # Fallback to default if empty
+
+    # Initialize API clients
+    try:
+        async_client = AsyncOpenAI(api_key=openai_api_key)
+        translator = deepl.Translator(deepl_api_key)
+    except Exception as e:
+        messagebox.showerror("API Error", f"Failed to initialize API clients: {str(e)}")
+        is_running = False
+        return
 
     deck_name = deck_entry.get()
     author = author_entry.get()
@@ -572,6 +590,7 @@ def run_all():
             logging.info("Operation was cancelled")
         except Exception as e:
             logging.error(f"An error occurred: {e}", exc_info=True)
+            error_queue.put(str(e))
         finally:
             is_running = False
             root.after(0, lambda: abort_button.config(state=tk.DISABLED))
@@ -587,9 +606,20 @@ def run_all():
             loop.close()
 
     executor.submit(run_async_main)
+    root.after(100, check_error_queue)
+    root.after(100, update_ui)  # Start updating UI
     logging.info("run_all completed")
+
+def check_error_queue():
+    try:
+        error_message = error_queue.get_nowait()
+        messagebox.showerror("Error", f"An error occurred: {error_message}")
+    except Empty:
+        if is_running:
+            root.after(100, check_error_queue)  # Check again after 100ms
+
 def update_ui():
-    global current_progress, current_phase
+    global current_progress, current_phase, is_running, total_cards
     try:
         while True:
             item = task_queue.get_nowait()
@@ -634,7 +664,21 @@ def update_ui():
     except Empty:
         pass
 
-    root.after(10, update_ui)
+    try:
+        error_message = error_queue.get_nowait()
+        messagebox.showerror("Error", f"An error occurred: {error_message}")
+        is_running = False
+        abort_button.config(state=tk.DISABLED)
+        deck_button.config(state=tk.NORMAL)
+    except Empty:
+        pass
+
+    if is_running:
+        root.after(100, update_ui)
+    else:
+        current_text = progress_label.cget("text")
+        if "Progress:" in current_text and not current_text.startswith("Deck creation completed"):
+            progress_label.config(text="Deck creation completed. Check for import status.")
 
 
 def abort_process():
@@ -723,6 +767,14 @@ start_date_picker.pack(fill=tk.X, padx=5, pady=5)
 ttk.Label(sidebar_frame, text="End Date:").pack(pady=5)
 end_date_picker = DateEntry(sidebar_frame, width=12, background='darkblue', foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
 end_date_picker.pack(fill=tk.X, padx=5, pady=5)
+
+ttk.Label(sidebar_frame, text="OpenAI API Key:").pack(pady=5)
+openai_key_entry = ttk.Entry(sidebar_frame)
+openai_key_entry.pack(fill=tk.X, padx=5, pady=5)
+
+ttk.Label(sidebar_frame, text="DeepL API Key:").pack(pady=5)
+deepl_key_entry = ttk.Entry(sidebar_frame)
+deepl_key_entry.pack(fill=tk.X, padx=5, pady=5)
 
 search_button = ttk.Button(sidebar_frame, text="Search Annotations", command=fetch_and_display_annotations)
 search_button.pack(fill=tk.X, padx=5, pady=20)
