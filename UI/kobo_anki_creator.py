@@ -42,6 +42,8 @@ class KoboAnkiCreator(UI, KoboUtils, AnkiUtils):
         self.async_client = None
         self.translator = None
 
+
+
         self.my_css = """
         .card {
         font-family: arial;
@@ -76,6 +78,9 @@ class KoboAnkiCreator(UI, KoboUtils, AnkiUtils):
         )
 
         self.setup_ui()
+
+        self.load_api_keys()
+
 
     def run_asyncio_coroutine(self, coroutine):
         asyncio.set_event_loop(asyncio.new_event_loop())

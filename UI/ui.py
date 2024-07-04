@@ -33,6 +33,37 @@ class UI:
         content_frame = ttk.Frame(main_frame)
         content_frame.pack(fill=tk.BOTH, expand=True, side=tk.LEFT, padx=10, pady=10)
 
+        # Top frame for API keys and sort options
+        top_frame = ttk.Frame(content_frame)
+        top_frame.pack(fill=tk.X, pady=10)
+
+        # API key entries and save button
+        api_frame = ttk.Frame(top_frame)
+        api_frame.pack(side=tk.RIGHT, fill=tk.X, expand=True)
+
+        ttk.Label(api_frame, text="OpenAI API Key:").pack(side=tk.LEFT, padx=5)
+        self.openai_key_entry = ttk.Entry(api_frame, width=20, show="*")
+        self.openai_key_entry.pack(side=tk.LEFT, padx=5)
+
+        ttk.Label(api_frame, text="DeepL API Key:").pack(side=tk.LEFT, padx=5)
+        self.deepl_key_entry = ttk.Entry(api_frame, width=20, show="*")
+        self.deepl_key_entry.pack(side=tk.LEFT, padx=5)
+
+        self.save_keys_button = ttk.Button(api_frame, text="Save API Keys", command=self.save_api_keys)
+        self.save_keys_button.pack(side=tk.LEFT, padx=5)
+
+        # Sort options
+        sort_frame = ttk.Frame(top_frame)
+        sort_frame.pack(side=tk.LEFT, padx=10)
+
+        self.sort_option = tk.StringVar(value='Author')
+        sort_menu = ttk.OptionMenu(sort_frame, self.sort_option, 'Author', 'Author', 'Book', 'Date Added')
+        sort_menu.pack(side=tk.LEFT, padx=5)
+
+        fetch_button = ttk.Button(sort_frame, text="Fetch Books & Authors",
+                                  command=self.fetch_books_and_authors_with_sort)
+        fetch_button.pack(side=tk.LEFT, padx=5)
+
         # Sidebar widgets
         ttk.Label(sidebar_frame, text="Deck Name").pack(pady=5)
         self.deck_entry = ttk.Entry(sidebar_frame)
@@ -56,14 +87,6 @@ class UI:
                                          borderwidth=2, date_pattern='yyyy-mm-dd')
         self.end_date_picker.pack(fill=tk.X, padx=5, pady=5)
 
-        ttk.Label(sidebar_frame, text="OpenAI API Key:").pack(pady=5)
-        self.openai_key_entry = ttk.Entry(sidebar_frame)
-        self.openai_key_entry.pack(fill=tk.X, padx=5, pady=5)
-
-        ttk.Label(sidebar_frame, text="DeepL API Key:").pack(pady=5)
-        self.deepl_key_entry = ttk.Entry(sidebar_frame)
-        self.deepl_key_entry.pack(fill=tk.X, padx=5, pady=5)
-
         self.search_button = ttk.Button(sidebar_frame, text="Search Annotations",
                                         command=self.fetch_and_display_annotations)
         self.search_button.pack(fill=tk.X, padx=5, pady=20)
@@ -74,18 +97,7 @@ class UI:
         self.abort_button = ttk.Button(sidebar_frame, text="Abort", command=self.abort_process, state=tk.DISABLED)
         self.abort_button.pack(fill=tk.X, padx=5, pady=20)
 
-        # Content frame widgets
-        sort_frame = ttk.Frame(content_frame)
-        sort_frame.pack(fill=tk.X, pady=10)
-
-        self.sort_option = tk.StringVar(value='Author')
-        sort_menu = ttk.OptionMenu(sort_frame, self.sort_option, 'Author', 'Author', 'Book', 'Date Added')
-        sort_menu.pack(side=tk.LEFT, padx=5)
-
-        fetch_button = ttk.Button(sort_frame, text="Fetch Books & Authors",
-                                  command=self.fetch_books_and_authors_with_sort)
-        fetch_button.pack(side=tk.LEFT, padx=5)
-
+        # Listbox
         self.listbox = tk.Listbox(content_frame, width=100, height=20, font=("Courier", 16))
         self.listbox.pack(fill=tk.BOTH, expand=True, pady=10)
 
@@ -232,3 +244,38 @@ class UI:
             current_text = self.progress_label.cget("text")
             if "Progress:" in current_text and not current_text.startswith("Deck creation completed"):
                 self.progress_label.config(text="Deck creation completed. Check for import status.")
+
+    def save_api_keys(self):
+        openai_key = self.openai_key_entry.get().strip()
+        deepl_key = self.deepl_key_entry.get().strip()
+
+        if not openai_key or not deepl_key:
+            messagebox.showerror("Error", "Both API keys must be provided.")
+            return
+
+        # Update this line to point to the correct api_keys.py file
+        api_keys_path = os.path.join(os.path.dirname(__file__), 'api_keys.py')
+
+        with open(api_keys_path, 'w') as f:
+            f.write(f"openai_key = '{openai_key}'\n")
+            f.write(f"DeepL = '{deepl_key}'\n")
+
+        messagebox.showinfo("Success", "API keys have been saved successfully.")
+
+        # Update the current session with new keys
+        self.openai_key = openai_key
+        self.deepl_key = deepl_key
+
+    def load_api_keys(self):
+        api_keys_path = os.path.join(os.path.dirname(__file__), 'api_keys.py')
+
+        if os.path.exists(api_keys_path):
+            with open(api_keys_path, 'r') as f:
+                exec(f.read(), globals())
+
+            self.openai_key = globals().get('openai_key', '')
+            self.deepl_key = globals().get('DeepL', '')
+
+            # Populate the entry fields
+            self.openai_key_entry.insert(0, self.openai_key)
+            self.deepl_key_entry.insert(0, self.deepl_key)
