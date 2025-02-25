@@ -1,25 +1,21 @@
-from pathlib import Path
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 from tkcalendar import DateEntry
-import deepl
-import random
 import datetime
-import genanki
-import requests
+from datetime import timedelta
 import os
-from queue import Queue, Empty
-import asyncio
-import logging
-from openai import AsyncOpenAI
-from typing import Optional
-from api_keys import openai_key, DeepL
-from concurrent.futures import ThreadPoolExecutor
-import sqlite3
+from queue import Empty
 import json
-import shutil
-import subprocess
+import sys
 
+
+def get_api_keys_path():
+    if getattr(sys, 'frozen', False):
+        # Running as compiled executable
+        return os.path.join(sys._MEIPASS, '', 'api_keys.py')
+    else:
+        # Running in a normal Python environment
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'api_keys.py')
 class UI:
     def setup_ui(self):
         self.root.title("Kobo Book and Author Fetcher")
@@ -49,6 +45,12 @@ class UI:
         self.deepl_key_entry = ttk.Entry(api_frame, width=20, show="*")
         self.deepl_key_entry.pack(side=tk.LEFT, padx=5)
 
+        self.use_tts = tk.BooleanVar(value=False)
+        self.tts_checkbox = ttk.Checkbutton(api_frame, text="Generate Audio (requires OpenAI API)",
+                                            variable=self.use_tts,
+                                            command=self.toggle_openai_entry)
+        self.tts_checkbox.pack(side=tk.LEFT, padx=5)
+
         self.save_keys_button = ttk.Button(api_frame, text="Save API Keys", command=self.save_api_keys)
         self.save_keys_button.pack(side=tk.LEFT, padx=5)
 
@@ -64,40 +66,77 @@ class UI:
                                   command=self.fetch_books_and_authors_with_sort)
         fetch_button.pack(side=tk.LEFT, padx=5)
 
-        # Sidebar widgets
+        # Sidebar widgets - using a specific pack order
+
+        # 1. Deck Name at the top
         ttk.Label(sidebar_frame, text="Deck Name").pack(pady=5)
         self.deck_entry = ttk.Entry(sidebar_frame)
         self.deck_entry.pack(fill=tk.X, padx=5, pady=5)
 
-        ttk.Label(sidebar_frame, text="Author:").pack(pady=5)
-        self.author_entry = ttk.Entry(sidebar_frame)
+        # 2. Kobo-specific fields
+        self.kobo_frame = ttk.LabelFrame(sidebar_frame, text="Kobo Annotations")
+        self.kobo_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        ttk.Label(self.kobo_frame, text="Author:").pack(pady=5)
+        self.author_entry = ttk.Entry(self.kobo_frame)
         self.author_entry.pack(fill=tk.X, padx=5, pady=5)
 
-        ttk.Label(sidebar_frame, text="Book Title:").pack(pady=5)
-        self.title_entry = ttk.Entry(sidebar_frame)
+        ttk.Label(self.kobo_frame, text="Book Title:").pack(pady=5)
+        self.title_entry = ttk.Entry(self.kobo_frame)
         self.title_entry.pack(fill=tk.X, padx=5, pady=5)
 
-        ttk.Label(sidebar_frame, text="Start Date:").pack(pady=5)
-        self.start_date_picker = DateEntry(sidebar_frame, width=12, background='darkblue', foreground='white',
+        ttk.Label(self.kobo_frame, text="Start Date:").pack(pady=5)
+        self.start_date_picker = DateEntry(self.kobo_frame, width=12, background='darkblue', foreground='white',
                                            borderwidth=2, date_pattern='yyyy-mm-dd')
         self.start_date_picker.pack(fill=tk.X, padx=5, pady=5)
 
-        ttk.Label(sidebar_frame, text="End Date:").pack(pady=5)
-        self.end_date_picker = DateEntry(sidebar_frame, width=12, background='darkblue', foreground='white',
+        ttk.Label(self.kobo_frame, text="End Date:").pack(pady=5)
+        self.end_date_picker = DateEntry(self.kobo_frame, width=12, background='darkblue', foreground='white',
                                          borderwidth=2, date_pattern='yyyy-mm-dd')
         self.end_date_picker.pack(fill=tk.X, padx=5, pady=5)
 
-        self.search_button = ttk.Button(sidebar_frame, text="Search Annotations",
+        self.search_button = ttk.Button(self.kobo_frame, text="Search Annotations",
                                         command=self.fetch_and_display_annotations)
-        self.search_button.pack(fill=tk.X, padx=5, pady=20)
+        self.search_button.pack(fill=tk.X, padx=5, pady=5)
 
-        self.deck_button = ttk.Button(sidebar_frame, text="Run", command=self.run_all)
-        self.deck_button.pack(fill=tk.X, padx=5, pady=20)
+        # 3. Text file import frame
+        self.import_frame = ttk.LabelFrame(sidebar_frame, text="Text File Import")
+        self.import_frame.pack(fill=tk.X, padx=5, pady=5)
 
-        self.abort_button = ttk.Button(sidebar_frame, text="Abort", command=self.abort_process, state=tk.DISABLED)
-        self.abort_button.pack(fill=tk.X, padx=5, pady=20)
+        self.import_path = tk.StringVar()
+        self.import_entry = ttk.Entry(self.import_frame, textvariable=self.import_path, state='readonly')
+        self.import_entry.pack(fill=tk.X, padx=5, pady=5)
 
-        # Listbox
+        import_buttons_frame = ttk.Frame(self.import_frame)
+        import_buttons_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        import_button = ttk.Button(import_buttons_frame, text="Browse...", command=self.browse_text_file)
+        import_button.pack(side=tk.LEFT, padx=5)
+
+        clear_button = ttk.Button(import_buttons_frame, text="Clear", command=self.clear_import)
+        clear_button.pack(side=tk.RIGHT, padx=5)
+
+        # 4. Source selection - now placed right before the action buttons
+        source_frame = ttk.LabelFrame(sidebar_frame, text="Source Selection")
+        source_frame.pack(fill=tk.X, padx=5, pady=10)
+
+        self.source_var = tk.StringVar(value="kobo")
+        ttk.Radiobutton(source_frame, text="Kobo Annotations", variable=self.source_var,
+                        value="kobo", command=self.toggle_source).pack(anchor=tk.W, padx=5, pady=2)
+        ttk.Radiobutton(source_frame, text="Imported Text File", variable=self.source_var,
+                        value="import", command=self.toggle_source).pack(anchor=tk.W, padx=5, pady=2)
+
+        # 5. Action buttons - now at the bottom
+        action_frame = ttk.Frame(sidebar_frame)
+        action_frame.pack(fill=tk.X, padx=5, pady=10)
+
+        self.deck_button = ttk.Button(action_frame, text="Run", command=self.run_all)
+        self.deck_button.pack(fill=tk.X, pady=5)
+
+        self.abort_button = ttk.Button(action_frame, text="Abort", command=self.abort_process, state=tk.DISABLED)
+        self.abort_button.pack(fill=tk.X, pady=5)
+
+        # Listbox in the main content area
         self.listbox = tk.Listbox(content_frame, width=100, height=20, font=("Courier", 16))
         self.listbox.pack(fill=tk.BOTH, expand=True, pady=10)
 
@@ -108,6 +147,49 @@ class UI:
         self.progress_label.pack(pady=5)
 
         self.listbox.bind('<Double-1>', self.on_listbox_select)
+
+        # Set up the initial state
+        self.toggle_source()
+
+    def toggle_source(self):
+        """Enable/disable UI elements based on the selected source"""
+        if self.source_var.get() == "kobo":
+            # Enable Kobo-related fields
+            for child in self.kobo_frame.winfo_children():
+                if isinstance(child, (ttk.Entry, DateEntry, ttk.Button)):
+                    child.config(state="normal")
+            self.kobo_frame.config(style='')
+            self.import_frame.config(style='Dim.TLabelframe')
+        else:
+            # Disable Kobo-related fields
+            for child in self.kobo_frame.winfo_children():
+                if isinstance(child, (ttk.Entry, DateEntry, ttk.Button)):
+                    child.config(state="disabled")
+            self.kobo_frame.config(style='Dim.TLabelframe')
+            self.import_frame.config(style='')
+
+    def browse_text_file(self):
+        """Open file dialog to select a text file"""
+        file_path = filedialog.askopenfilename(
+            title="Select Text File",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+        )
+        if file_path:
+            self.import_path.set(file_path)
+            # If a file is selected, automatically switch to import mode
+            self.source_var.set("import")
+            self.toggle_source()
+
+    def clear_import(self):
+        """Clear the import file path"""
+        self.import_path.set("")
+
+    def toggle_openai_entry(self):
+        """Enable or disable the OpenAI API key entry based on checkbox state"""
+        if self.use_tts.get():
+            self.openai_key_entry.config(state="normal")
+        else:
+            self.openai_key_entry.config(state="disabled")
     def display_annotations(self, annotations):
         self.listbox.delete(0, tk.END)
 
@@ -195,14 +277,22 @@ class UI:
                     self.listbox.delete(0, tk.END)
                     self.current_progress = 0
                     self.processed_cards.clear()
-                    self.current_phase = "Text-to-Speech" if phase == "Translation" else "Complete"
+
+                    # Update phase label based on TTS setting
+                    if phase == "Translation":
+                        self.current_phase = "Text-to-Speech" if self.use_tts.get() else "Processing Cards"
+                    else:
+                        self.current_phase = "Complete"
+
                     self.progress_label.config(text=f"{self.current_phase} Progress: 0/{self.total_cards}")
+
+                # Rest of existing update_ui code...
                 elif item[0] == "DONE":
                     _, _, self.total_cards, _ = item
                     self.progress_bar["value"] = self.total_cards
                     self.progress_label.config(text=f"Progress: {self.total_cards}/{self.total_cards}")
                     self.processed_cards.clear()
-                elif item[0] in ["TRANSLATE", "TTS"]:
+                elif item[0] in ["TRANSLATE", "TTS", "Processing"]:
                     _, lang, eng, index, self.total_cards = item
                     self.processed_cards[index] = (lang, eng)
 
@@ -245,37 +335,26 @@ class UI:
             if "Progress:" in current_text and not current_text.startswith("Deck creation completed"):
                 self.progress_label.config(text="Deck creation completed. Check for import status.")
 
+
     def save_api_keys(self):
-        openai_key = self.openai_key_entry.get().strip()
-        deepl_key = self.deepl_key_entry.get().strip()
-
-        if not openai_key or not deepl_key:
-            messagebox.showerror("Error", "Both API keys must be provided.")
-            return
-
-        # Update this line to point to the correct api_keys.py file
-        api_keys_path = os.path.join(os.path.dirname(__file__), 'api_keys.py')
-
-        with open(api_keys_path, 'w') as f:
-            f.write(f"openai_key = '{openai_key}'\n")
-            f.write(f"DeepL = '{deepl_key}'\n")
-
-        messagebox.showinfo("Success", "API keys have been saved successfully.")
-
-        # Update the current session with new keys
-        self.openai_key = openai_key
-        self.deepl_key = deepl_key
+        api_keys = {
+            'openai_key': self.openai_key_entry.get().strip(),
+            'deepl_key': self.deepl_key_entry.get().strip()
+        }
+        os.makedirs(self.get_user_data_dir(), exist_ok=True)
+        with open(self.get_api_keys_path(), 'w') as f:
+            json.dump(api_keys, f)
 
     def load_api_keys(self):
-        api_keys_path = os.path.join(os.path.dirname(__file__), 'api_keys.py')
-
+        api_keys_path = self.get_api_keys_path()
         if os.path.exists(api_keys_path):
             with open(api_keys_path, 'r') as f:
-                exec(f.read(), globals())
-
-            self.openai_key = globals().get('openai_key', '')
-            self.deepl_key = globals().get('DeepL', '')
+                api_keys = json.load(f)
+            self.openai_key = api_keys.get('openai_key', '')
+            self.deepl_key = api_keys.get('deepl_key', '')
 
             # Populate the entry fields
+            self.openai_key_entry.delete(0, tk.END)
             self.openai_key_entry.insert(0, self.openai_key)
+            self.deepl_key_entry.delete(0, tk.END)
             self.deepl_key_entry.insert(0, self.deepl_key)

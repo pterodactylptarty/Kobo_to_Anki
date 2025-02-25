@@ -1,20 +1,7 @@
 from pathlib import Path
 import tkinter as tk
-from tkinter import ttk, messagebox
-from tkcalendar import DateEntry
-import deepl
-import random
-import datetime
-import genanki
-import requests
-import os
-from queue import Queue, Empty
-import asyncio
-import logging
-from openai import AsyncOpenAI
+from tkinter import messagebox
 from typing import Optional
-from api_keys import openai_key, DeepL
-from concurrent.futures import ThreadPoolExecutor
 import sqlite3
 import json
 import shutil
@@ -96,8 +83,8 @@ class KoboUtils:
         self.listbox.insert(tk.END, "-" * len(header))
 
         for result in results:
-            author = result[1][:28] + '..' if len(result[1]) > 30 else result[1]
-            book = result[0][:38] + '..' if len(result[0]) > 40 else result[0]
+            author = result[1]#[:28] + '..' if len(result[1]) > 30 else result[1]
+            book = result[0] #[:38] + '..' if len(result[0]) > 40 else result[0]
             date_added = result[2][:19]
 
             formatted_line = f"{author:<30} | {book:<40} | {date_added:<20}"
