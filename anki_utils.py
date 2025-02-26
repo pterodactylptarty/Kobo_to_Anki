@@ -165,10 +165,10 @@ class AnkiUtils:
             import_success = self.import_deck_to_anki(deck_path)
             if import_success:
                 logging.info("Deck imported successfully")
-                message = f"Deck creation completed and imported to Anki!\nSaved at: {deck_path}"
+                message = f"Deck creation completed and imported to Anki!\nSaved at: {deck_path}\nClick 'Open Deck Folder' to access it."
             else:
                 logging.warning("Deck import failed")
-                message = f"Deck creation completed, but import to Anki failed.\nDeck saved at: {deck_path}"
+                message = f"Deck creation completed, but import to Anki failed.\nDeck saved at: {deck_path}\nClick 'Open Deck Folder' to access it."
 
             self.root.after(0, lambda msg=message: self.progress_label.config(text=msg))
         except Exception as e:
@@ -180,5 +180,19 @@ class AnkiUtils:
             self.is_running = False
             self.root.after(0, lambda: self.abort_button.config(state=tk.DISABLED))
             self.root.after(0, lambda: self.deck_button.config(state=tk.NORMAL))
+            self.root.after(0, lambda: self.open_dir_button.config(state=tk.NORMAL))  # Enable the button
             self.root.after(0, self.update_ui)
         logging.info("Post-processing completed")
+
+    def open_deck_directory(self):
+        deck_dir = self.get_anki_deck_dir()
+        if os.path.exists(deck_dir):
+            # Open the directory using the default file explorer
+            if os.name == 'nt':  # Windows
+                os.startfile(deck_dir)
+            elif os.name == 'posix':  # macOS and Linux
+                import subprocess
+                if 'darwin' in os.uname().sysname.lower():  # macOS
+                    subprocess.call(['open', deck_dir])
+                else:  # Linux
+                    subprocess.call(['xdg-open', deck_dir])
