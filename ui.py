@@ -99,6 +99,8 @@ class UI:
                                         command=self.fetch_and_display_annotations)
         self.search_button.pack(fill=tk.X, padx=5, pady=5)
 
+
+
         # 3. Text file import frame
         self.import_frame = ttk.LabelFrame(sidebar_frame, text="Text File Import")
         self.import_frame.pack(fill=tk.X, padx=5, pady=5)
@@ -136,6 +138,9 @@ class UI:
         self.abort_button = ttk.Button(action_frame, text="Abort", command=self.abort_process, state=tk.DISABLED)
         self.abort_button.pack(fill=tk.X, pady=5)
 
+        self.open_dir_button = ttk.Button(action_frame, text="Open Deck Folder", command=self.open_deck_directory)
+        self.open_dir_button.pack(fill=tk.X, pady=5)
+
         # Listbox in the main content area
         self.listbox = tk.Listbox(content_frame, width=100, height=20, font=("Courier", 16))
         self.listbox.pack(fill=tk.BOTH, expand=True, pady=10)
@@ -150,6 +155,8 @@ class UI:
 
         # Set up the initial state
         self.toggle_source()
+
+
 
     def toggle_source(self):
         """Enable/disable UI elements based on the selected source"""
